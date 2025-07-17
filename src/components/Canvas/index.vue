@@ -1,4 +1,15 @@
 <script setup lang="ts">
+	import { useStoreEmailBuilder } from '@/composables/useStoreEmailBuilder'
+	import type {
+		BaseBlock,
+		Block,
+		BlockData,
+		BlockDatas,
+		BlockType,
+		ButtonBlockData,
+		ImageBlockData,
+		TextBlockData,
+	} from '@/types/blocks'
 	import {
 		computed,
 		defineAsyncComponent,
@@ -7,21 +18,15 @@
 		type Component,
 	} from 'vue'
 
-	interface CanvasBlock {
-		id: symbol
-		type: string
-	}
+	const { canvasBlocks, hasCanvasBlocks, store } = useStoreEmailBuilder()
 
 	const isDragOver = ref(false)
-	const canvasBlocks = ref<CanvasBlock[]>([])
 
-	const blockMap: Record<string, Component> = markRaw({
+	const blockMap: Record<BlockType, Component> = markRaw({
 		text: defineAsyncComponent(() => import('../Blocks/TextBlock.vue')),
 		image: defineAsyncComponent(() => import('../Blocks/ImageBlock.vue')),
 		button: defineAsyncComponent(() => import('../Blocks/ButtonBlock.vue')),
 	})
-
-	const hasCanvasBlocks = computed(() => canvasBlocks.value.length > 0)
 
 	const getCanvasText = computed(() =>
 		!isDragOver.value ? 'Перетащите блок сюда' : 'Отпустите, чтобы добавить'
@@ -32,14 +37,15 @@
 	}))
 
 	const onDrop = (e: DragEvent) => {
-		const toolId = e.dataTransfer?.getData('text/plain')
-		if (toolId && blockMap[toolId]) {
-			canvasBlocks.value.push({
-				id: Symbol('canvasBlockId'),
-				type: toolId,
-			})
+		const toolId = e.dataTransfer?.getData('text/plain') as BlockType
+		if (toolId) {
+			store.addBlock(toolId)
 		}
 		isDragOver.value = false
+	}
+
+	const onClickBlockItem = (block: Block) => {
+		store.selectBlock(block)
 	}
 
 	const onDragLeave = () => {
@@ -62,8 +68,13 @@
 	>
 		<template v-if="hasCanvasBlocks">
 			<div class="blocks-list">
-				<div v-for="block in canvasBlocks" :key="block.id" class="block-item">
-					<component :is="blockMap[block.type]" />
+				<div
+					v-for="block in canvasBlocks"
+					:key="block.id"
+					class="block-item"
+					@click="onClickBlockItem(block)"
+				>
+					<component :is="blockMap[block.type]" v-bind="block.data" />
 				</div>
 			</div>
 		</template>
@@ -92,5 +103,9 @@
 	.canvas.is-over {
 		background-color: #e8f0fe;
 		border-color: #007bff;
+	}
+
+	.block-item {
+		cursor: pointer;
 	}
 </style>
